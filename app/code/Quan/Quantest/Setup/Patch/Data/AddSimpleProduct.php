@@ -12,7 +12,6 @@ use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Framework\Setup\Patch\DataPatchInterface;
 use Magento\Framework\App\State;
 use Magento\Catalog\Api\CategoryLinkManagementInterface;
-use Magento\Catalog\Api\Data\CategoryProductLinkInterface;
 
 class AddSimpleProduct implements DataPatchInterface
 {
@@ -25,6 +24,11 @@ class AddSimpleProduct implements DataPatchInterface
      * @var ProductRepositoryInterface
      */
     protected $productRepository;
+
+    /**
+     * @var CategoryLinkManagementInterface
+     */
+    protected $categoryLinkManagement;
 
     /**
      * CreateSimpleProduct constructor.
