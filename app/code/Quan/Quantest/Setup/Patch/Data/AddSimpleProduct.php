@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @category Quan
  * @package  Quan\Quantest
@@ -12,49 +13,86 @@ use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Framework\Setup\Patch\DataPatchInterface;
 use Magento\Framework\App\State;
 use Magento\Catalog\Api\CategoryLinkManagementInterface;
+use Magento\InventoryApi\Api\Data\SourceItemInterfaceFactory;
+use Magento\InventoryApi\Api\Data\SourceItemInterface;
+use Magento\InventoryApi\Api\SourceItemsSaveInterface;
 
 class AddSimpleProduct implements DataPatchInterface
 {
     /**
      * @var ProductInterfaceFactory
      */
-    protected $productFactory;
+    protected ProductInterfaceFactory $productFactory;
 
     /**
      * @var ProductRepositoryInterface
      */
-    protected $productRepository;
+    protected ProductRepositoryInterface $productRepository;
 
     /**
      * @var CategoryLinkManagementInterface
      */
-    protected $categoryLinkManagement;
+    protected CategoryLinkManagementInterface $categoryLinkManagement;
+
+    /**
+     * @var State
+     */
+    protected State $appState;
+
+    /**
+     * @var SourceItemInterfaceFactory
+     */
+    protected SourceItemInterfaceFactory $sourceItemFactory;
+
+    /**
+     * @var SourceItemsSaveInterface
+     */
+    protected SourceItemsSaveInterface $sourceItemsSaveInterface;
 
     /**
      * CreateSimpleProduct constructor.
      * @param ProductInterfaceFactory $productFactory
      * @param ProductRepositoryInterface $productRepository
-     * @param CategoryRepositoryInterface $categoryRepository
+     * @param CategoryLinkManagementInterface $categoryLinkManagement
+     * @param State $appState
+     * @param SourceItemInterfaceFactory $sourceItemFactory
+     * @param SourceItemsSaveInterface $sourceItemsSaveInterface
      */
     public function __construct(
         ProductInterfaceFactory $productFactory,
         ProductRepositoryInterface $productRepository,
-        State $state,
-        CategoryLinkManagementInterface $categoryLinkManagement
-    )
-    {
+        State $appState,
+        CategoryLinkManagementInterface $categoryLinkManagement,
+        SourceItemInterfaceFactory $sourceItemFactory,
+        SourceItemsSaveInterface $sourceItemsSaveInterface
+    ) {
         $this->productFactory     = $productFactory;
         $this->productRepository  = $productRepository;
         $this->categoryLinkManagement = $categoryLinkManagement;
-        $state->setAreaCode('adminhtml');
+        $this->appState = $appState;
+        $this->sourceItemFactory = $sourceItemFactory;
+        $this->sourceItemsSaveInterface = $sourceItemsSaveInterface;
     }
 
     /**
-     * @return string
+     * @return void
      */
-    public function apply()
+    public function apply(): void
+    {
+        // run setup in back-end area
+        $this->appState->emulateAreaCode('adminhtml', [$this, 'execute']);
+    }
+
+    /**
+     * @return void
+     */
+    public function execute(): void
     {
         $product = $this->productFactory->create();
+
+        if ($product->getIdBySku('QUANTEST')) {
+            return;
+        }
 
         $simpleProductArray = [
             [
@@ -82,25 +120,39 @@ class AddSimpleProduct implements DataPatchInterface
                 ->setTypeId($data['type_id'])
                 ->setStockData(
                     array(
-                        'use_config_manage_stock' => 0,
                         'manage_stock' => 1,
                         'is_in_stock' => 1,
-                        'qty' => 199
                     )
                 );
             $product = $this->productRepository->save($product);
-            $product->save();
+        }
+
+        $sourceItem = $this->sourceItemFactory->create();
+        $sourceItem ->setSourceCode('default');
+        $sourceItem ->setQuantity(10);
+        $sourceItem ->setSku($product->getSku());
+        $sourceItem ->setStatus(SourceItemInterface::STATUS_IN_STOCK);
+        $this->sourceItems[] = $sourceItem;
+
+		if ($this->sourceItems) {
+		    $this->sourceItemsSaveInterface->execute($this->sourceItems);
         }
 
         $this->categoryLinkManagement->assignProductToCategories($data['sku'], [2]);
     }
 
-    public static function getDependencies()
+    /**
+     * @return array
+     */
+    public static function getDependencies(): array
     {
         return [];
     }
 
-    public function getAliases()
+    /**
+     * @return array
+     */
+    public function getAliases(): array
     {
         return [];
     }
